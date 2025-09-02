@@ -23,20 +23,21 @@ type WooOrder = {
 
 function toRow(o: WooOrder) {
   const totalCents = Math.round(parseFloat(o.total ?? "0") * 100);
-  const name =
-    [o.billing?.first_name, o.billing?.last_name].filter(Boolean).join(" ").trim() ||
-    undefined;
+  const name = [o.billing?.first_name, o.billing?.last_name]
+    .filter(Boolean)
+    .join(" ")
+    .trim();
 
   return {
     id: o.id,
-    number: o.number,
-    status: o.status,
+    number: o.number ?? String(o.id),           // <- ensure string
+    status: o.status ?? "",                     // <- ensure string
     totalCents,
     createdAt: new Date(o.date_created_gmt + "Z"),
     modifiedAt: new Date(o.date_modified_gmt + "Z"),
-    billingName: name,
-    billingEmail: o.billing?.email || undefined,
-    paymentMethod: o.payment_method || undefined,
+    billingName: name || "",                    // <- ensure string
+    billingEmail: o.billing?.email ?? "",       // <- ensure string
+    paymentMethod: o.payment_method ?? "",      // <- ensure string
   };
 }
 
@@ -52,14 +53,37 @@ export async function GET(req: Request) {
 
   for (const o of orders) {
     const row = toRow(o);
+
+    const createData = {
+      id: row.id,
+      number: row.number,
+      status: row.status,
+      totalCents: row.totalCents,
+      createdAt: row.createdAt,
+      modifiedAt: row.modifiedAt,
+      billingName: row.billingName,
+      billingEmail: row.billingEmail,
+      paymentMethod: row.paymentMethod,
+    };
+
+    const updateData = {
+      number: row.number,
+      status: row.status,
+      totalCents: row.totalCents,
+      createdAt: row.createdAt,
+      modifiedAt: row.modifiedAt,
+      billingName: row.billingName,
+      billingEmail: row.billingEmail,
+      paymentMethod: row.paymentMethod,
+    };
+
     await prisma.order.upsert({
       where: { id: row.id },
-      update: row,
-      create: row,
+      update: updateData,
+      create: createData,
     });
   }
 
-  // advance cursor to "now" (safe even if zero results)
   await setCursor(CURSOR_ID, startedIso);
 
   console.log(
