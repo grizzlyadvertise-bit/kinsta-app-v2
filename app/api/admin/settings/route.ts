@@ -1,6 +1,6 @@
 // app/api/admin/settings/route.ts
-import { NextResponse } from "next/server";
 import { listSettings, setSetting, DEFINITIONS } from "@/lib/settings";
+import { NextResponse } from "next/server";
 
 function assertAllowed(req: Request) {
   // First-run: allow access if no GOOGLE_CLIENT_ID is set anywhere.
@@ -9,7 +9,7 @@ function assertAllowed(req: Request) {
   // (Later, we’ll add NextAuth here. For now, we trust possession of app URL.)
 }
 
-export async function GET() {
+export async function GET(_req: Request) {
   assertAllowed(new Request("http://local"));
   const entries = await listSettings();
   return NextResponse.json(entries);
