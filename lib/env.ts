@@ -2,7 +2,7 @@
 import { z } from "zod";
 
 const envSchema = z.object({
-  NEXTAUTH_URL: z.string().url(),
+  NEXTAUTH_URL: z.string().url().optional(),   // optional if you don't use it elsewhere
   NEXTAUTH_SECRET: z.string().min(16),
 
   GOOGLE_CLIENT_ID: z.string(),
@@ -22,7 +22,8 @@ const envSchema = z.object({
 
   APP_CRON_SECRET: z.string(),
 
-  GMAIL_BACKFILL_DAYS: z.string().transform(v => parseInt(v || "30", 10)).default("30"),
+  // ✅ Fix: coerce env string to number and default to 30
+  GMAIL_BACKFILL_DAYS: z.coerce.number().default(30),
 
   E_TRANSFER_METHODS: z.string().default(""),
 });
