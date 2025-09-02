@@ -13,3 +13,23 @@ model Setting {
   isSecret  Boolean  @default(false)
   updatedAt DateTime @updatedAt
 }
+model JobCursor {
+  id        String  @id          // e.g., "woo_last_synced_at"
+  value     String               // ISO timestamp or other cursor
+  updatedAt DateTime @updatedAt
+}
+
+model Order {
+  id             Int     @id
+  number         String
+  totalCents     Int
+  status         String
+  createdAt      DateTime
+  modifiedAt     DateTime
+  billingName    String?
+  billingEmail   String?
+  paymentMethod  String?
+  // For convenience when we export to Sheets:
+  lastSyncedAt   DateTime?
+  @@index([modifiedAt])
+}
