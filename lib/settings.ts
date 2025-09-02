@@ -16,18 +16,21 @@ export const DEFINITIONS: KeyDef[] = [
   { key: "SHEETS_TAB_DEPOSITS" },
   { key: "SHEETS_TAB_UNMATCHED" },
   { key: "MATCH_MIN_CONFIDENCE" },
-  { key: "GMAIL_BACKFILL_DAYS" }, // renamed to match your env usage
+  { key: "GMAIL_BACKFILL_DAYS" },
   { key: "PARSE_MAX_BODY_CHARS" },
   { key: "ETR_RECIPIENT_EMAILS" },
   { key: "SAFE_MODE" },
   { key: "APP_CRON_SECRET", secret: true },
 ];
 
+// typed access to process.env
+function readEnv(key: string): string | undefined {
+  return process.env[key as keyof NodeJS.ProcessEnv];
+}
+
 export async function getSetting(key: string): Promise<string | undefined> {
   const row = await prisma.setting.findUnique({ where: { key } });
-  if (!row) {
-    return process.env[key];
-  }
+  if (!row) return readEnv(key);
   return row.isSecret ? decrypt(row.value) : row.value;
 }
 
@@ -56,7 +59,7 @@ export async function listSettings(): Promise<ListedSetting[]> {
   const map = new Map(rows.map((r) => [r.key, r]));
   return DEFINITIONS.map((d) => {
     const dbVal = map.get(d.key)?.value;
-    const envVal = process.env[d.key];
+    const envVal = readEnv(d.key);
     return {
       key: d.key,
       isSecret: !!d.secret,

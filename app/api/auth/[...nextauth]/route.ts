@@ -22,7 +22,6 @@ const allowed = GOOGLE_ALLOWED_EMAIL
   .map((s) => s.trim().toLowerCase())
   .filter(Boolean);
 
-// Extend the token/session types locally (avoid `any`)
 type TokenWithGoogle = JWT & {
   access_token?: string;
   refresh_token?: string;
@@ -34,7 +33,7 @@ type SessionWithTokens = Session & {
   refreshToken?: string;
 };
 
-export const authOptions: NextAuthOptions = {
+const options: NextAuthOptions = {
   providers: [
     GoogleProvider({
       clientId: GOOGLE_CLIENT_ID,
@@ -58,11 +57,9 @@ export const authOptions: NextAuthOptions = {
     async jwt({ token, account }) {
       const t = token as TokenWithGoogle;
       if (account) {
-        // Persist Google tokens from the provider account
         t.access_token = (account.access_token as string | undefined) ?? t.access_token;
         t.refresh_token = (account.refresh_token as string | undefined) ?? t.refresh_token;
 
-        // Some providers give expires_at (epoch seconds); others give expires_in (seconds)
         const expiresInMs =
           account.expires_in !== undefined ? Number(account.expires_in) * 1000 : 0;
         const expiresAtMs =
@@ -86,5 +83,5 @@ export const authOptions: NextAuthOptions = {
   secret: NEXTAUTH_SECRET,
 };
 
-const handler = NextAuth(authOptions);
+const handler = NextAuth(options);
 export { handler as GET, handler as POST };
