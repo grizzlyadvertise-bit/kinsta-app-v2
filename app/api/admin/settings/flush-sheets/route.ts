@@ -2,7 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { appendRows } from "@/lib/sheets";
 import { getSetting } from "@/lib/settings";
 
-export async function POST() {
+export async function GET() {
   const safe = (await getSetting("SAFE_MODE"))?.toString().toLowerCase() === "true";
   if (safe) return new Response("SAFE_MODE is true; not writing", { status: 400 });
 
