@@ -1,26 +1,35 @@
+// app/api/admin/seed-headers/route.ts
 export const runtime = "nodejs";
 
 import { NextRequest, NextResponse } from "next/server";
-import { appendRows } from "@/lib/sheets";
+import { appendRows, getAccessToken } from "@/lib/sheets";
+import { getSetting } from "@/lib/settings";
 
-// Minimal readAll using your existing SA token flow.
-// Add this small helper so we can check if a tab is empty.
+// Minimal typed helpers
+type SeedResult = { tab: string; created: boolean };
+
 async function readAll(tab: string): Promise<string[][]> {
-  // Reuse your lib/sheets token exchange path:
-  // We'll import getSetting and do a raw fetch like your appendRows
-  const { getSetting } = await import("@/lib/settings");
   const spreadsheetId = await getSetting("SHEETS_SPREADSHEET_ID");
   if (!spreadsheetId) throw new Error("SHEETS_SPREADSHEET_ID not set");
-
-  // Borrow your getAccessToken from lib/sheets.ts (we import it dynamically)
-  const sheetsLib: any = await import("@/lib/sheets");
-  const token = await sheetsLib.getAccessToken();
+  const token = await getAccessToken();
 
   const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${encodeURIComponent(tab)}!A1:ZZ`;
   const r = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
-  if (!r.ok) return [];
-  const json = await r.json();
-  return (json.values ?? []) as string[][];
+  if (!r.ok) {
+    // If the tab is missing, treat as empty for the purposes of seeding headers
+    return [];
+  }
+  const json = (await r.json()) as { values?: string[][] };
+  return json.values ?? [];
+}
+
+async function ensureHeader(tab: string, header: string[]): Promise<SeedResult> {
+  const cur = await readAll(tab);
+  if (cur.length === 0) {
+    await appendRows(tab, [header]);
+    return { tab, created: true };
+  }
+  return { tab, created: false };
 }
 
 export async function GET(req: NextRequest) {
@@ -34,20 +43,11 @@ export async function GET(req: NextRequest) {
   const UNMATCHED = process.env.SHEETS_TAB_UNMATCHED || "Unmatched";
   const LEDGER = process.env.SHEETS_TAB_LEDGER || "Ledger";
 
-  const ensure = async (tab: string, header: string[]) => {
-    const cur = await readAll(tab);
-    if (cur.length === 0) {
-      await appendRows(tab, [header]);
-      return { tab, created: true };
-    }
-    return { tab, created: false };
-  };
-
-  const results = [];
-  results.push(await ensure(ORDERS, ["id","number","status","totalCents","createdAt","modifiedAt","billingName","billingEmail","paymentMethod"]));
-  results.push(await ensure(DEPOSITS, ["id","ts","sender_name","amount","snippet"]));
-  results.push(await ensure(UNMATCHED, ["deposit_id","reason","notes","created_at"]));
-  results.push(await ensure(LEDGER, ["deposit_id","applied_amount","applied_ts","order_id"]));
+  const results: SeedResult[] = [];
+  results.push(await ensureHeader(ORDERS,   ["id","number","status","totalCents","createdAt","modifiedAt","billingName","billingEmail","paymentMethod"]));
+  results.push(await ensureHeader(DEPOSITS, ["id","ts","sender_name","amount","snippet"]));
+  results.push(await ensureHeader(UNMATCHED,["deposit_id","reason","notes","created_at"]));
+  results.push(await ensureHeader(LEDGER,   ["deposit_id","applied_amount","applied_ts","order_id"]));
 
   return NextResponse.json({ ok: true, results });
 }

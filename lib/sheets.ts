@@ -2,7 +2,7 @@
 import jwt from "jsonwebtoken";
 import { getSetting } from "./settings";
 
-async function getAccessToken() {
+export async function getAccessToken(): Promise<string> {
   const clientEmail = await getSetting("GOOGLE_SA_CLIENT_EMAIL");
   const privateKeyRaw = await getSetting("GOOGLE_SA_PRIVATE_KEY");
   if (!clientEmail || !privateKeyRaw) throw new Error("Service Account not configured");
@@ -24,8 +24,8 @@ async function getAccessToken() {
     body: new URLSearchParams({ grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer", assertion }),
   });
   if (!r.ok) throw new Error("Token exchange failed: " + (await r.text()));
-  const json = await r.json();
-  return json.access_token as string;
+  const json = (await r.json()) as { access_token: string };
+  return json.access_token;
 }
 
 export async function appendRows(tab: string, rows: (string|number|null)[][]) {
