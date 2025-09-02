@@ -5,19 +5,19 @@ import NextAuth, { type NextAuthOptions, type Session } from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
 import { type JWT } from "next-auth/jwt";
 
-const {
-  NEXTAUTH_SECRET,
-  NEXTAUTH_URL,
-  GOOGLE_CLIENT_ID,
-  GOOGLE_CLIENT_SECRET,
-  GOOGLE_ALLOWED_EMAIL,
-} = process.env;
-
-if (!NEXTAUTH_SECRET || !GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET || !NEXTAUTH_URL) {
-  throw new Error("Missing auth env vars");
+// Small helper to assert envs are present and typed
+function requireEnv(name: string): string {
+  const v = process.env[name];
+  if (!v) throw new Error(`Missing env: ${name}`);
+  return v;
 }
 
-const allowed = (GOOGLE_ALLOWED_EMAIL || "")
+const NEXTAUTH_SECRET = requireEnv("NEXTAUTH_SECRET");
+const GOOGLE_CLIENT_ID = requireEnv("GOOGLE_CLIENT_ID");
+const GOOGLE_CLIENT_SECRET = requireEnv("GOOGLE_CLIENT_SECRET");
+const GOOGLE_ALLOWED_EMAIL = process.env.GOOGLE_ALLOWED_EMAIL || "";
+
+const allowed = GOOGLE_ALLOWED_EMAIL
   .split(",")
   .map((s) => s.trim().toLowerCase())
   .filter(Boolean);
@@ -28,12 +28,13 @@ type TokenWithGoogle = JWT & {
   refresh_token?: string;
   expires_at?: number;
 };
+
 type SessionWithTokens = Session & {
   accessToken?: string;
   refreshToken?: string;
 };
 
-const options: NextAuthOptions = {
+export const authOptions: NextAuthOptions = {
   providers: [
     GoogleProvider({
       clientId: GOOGLE_CLIENT_ID,
@@ -57,10 +58,20 @@ const options: NextAuthOptions = {
     async jwt({ token, account }) {
       const t = token as TokenWithGoogle;
       if (account) {
-        // Persist Google tokens
+        // Persist Google tokens from the provider account
         t.access_token = (account.access_token as string | undefined) ?? t.access_token;
         t.refresh_token = (account.refresh_token as string | undefined) ?? t.refresh_token;
-        t.expires_at = Date.now() + ((account.expires_in ?? 0) * 1000);
+
+        // Some providers give expires_at (epoch seconds); others give expires_in (seconds)
+        const expiresInMs =
+          account.expires_in !== undefined ? Number(account.expires_in) * 1000 : 0;
+        const expiresAtMs =
+          (account as { expires_at?: number }).expires_at !== undefined
+            ? Number((account as { expires_at?: number }).expires_at) * 1000
+            : 0;
+
+        if (expiresAtMs > 0) t.expires_at = expiresAtMs;
+        else if (expiresInMs > 0) t.expires_at = Date.now() + expiresInMs;
       }
       return t;
     },
@@ -75,5 +86,5 @@ const options: NextAuthOptions = {
   secret: NEXTAUTH_SECRET,
 };
 
-const handler = NextAuth(options);
+const handler = NextAuth(authOptions);
 export { handler as GET, handler as POST };
