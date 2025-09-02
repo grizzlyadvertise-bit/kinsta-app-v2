@@ -1,8 +1,9 @@
 // app/api/auth/[...nextauth]/route.ts
 export const runtime = "nodejs";
 
-import NextAuth, { type NextAuthOptions } from "next-auth";
+import NextAuth, { type NextAuthOptions, type Session } from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
+import { type JWT } from "next-auth/jwt";
 
 const {
   NEXTAUTH_SECRET,
@@ -18,8 +19,19 @@ if (!NEXTAUTH_SECRET || !GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET || !NEXTAUTH_
 
 const allowed = (GOOGLE_ALLOWED_EMAIL || "")
   .split(",")
-  .map(s => s.trim().toLowerCase())
+  .map((s) => s.trim().toLowerCase())
   .filter(Boolean);
+
+// Extend the token/session types locally (avoid `any`)
+type TokenWithGoogle = JWT & {
+  access_token?: string;
+  refresh_token?: string;
+  expires_at?: number;
+};
+type SessionWithTokens = Session & {
+  accessToken?: string;
+  refreshToken?: string;
+};
 
 const options: NextAuthOptions = {
   providers: [
@@ -43,17 +55,21 @@ const options: NextAuthOptions = {
       return allowed.includes(email);
     },
     async jwt({ token, account }) {
+      const t = token as TokenWithGoogle;
       if (account) {
-        token.access_token = account.access_token;
-        token.refresh_token = account.refresh_token;
-        token.expires_at = Date.now() + (account.expires_in ?? 0) * 1000;
+        // Persist Google tokens
+        t.access_token = (account.access_token as string | undefined) ?? t.access_token;
+        t.refresh_token = (account.refresh_token as string | undefined) ?? t.refresh_token;
+        t.expires_at = Date.now() + ((account.expires_in ?? 0) * 1000);
       }
-      return token;
+      return t;
     },
     async session({ session, token }) {
-      (session as any).access_token = token.access_token;
-      (session as any).refresh_token = token.refresh_token;
-      return session;
+      const s = session as SessionWithTokens;
+      const t = token as TokenWithGoogle;
+      s.accessToken = t.access_token;
+      s.refreshToken = t.refresh_token;
+      return s;
     },
   },
   secret: NEXTAUTH_SECRET,
