@@ -4,9 +4,29 @@ import { listOrdersModifiedSince } from "@/lib/woo";
 import { prisma } from "@/lib/prisma";
 import { getCursor, setCursor } from "@/lib/cursor";
 
-function toRow(o: any) {
-  const totalCents = Math.round(parseFloat(o.total || "0") * 100);
-  const name = [o.billing?.first_name, o.billing?.last_name].filter(Boolean).join(" ").trim() || undefined;
+// Minimal Woo order shape we actually use
+type WooOrder = {
+  id: number;
+  number?: string;
+  status?: string;
+  total?: string;
+  date_created_gmt: string;
+  date_modified_gmt: string;
+  billing?: {
+    first_name?: string;
+    last_name?: string;
+    email?: string;
+  };
+  payment_method?: string;
+  [k: string]: unknown;
+};
+
+function toRow(o: WooOrder) {
+  const totalCents = Math.round(parseFloat(o.total ?? "0") * 100);
+  const name =
+    [o.billing?.first_name, o.billing?.last_name].filter(Boolean).join(" ").trim() ||
+    undefined;
+
   return {
     id: o.id,
     number: o.number,
@@ -28,7 +48,8 @@ export async function GET(req: Request) {
   const since = await getCursor(CURSOR_ID);
   const startedIso = new Date().toISOString();
 
-  const orders = await listOrdersModifiedSince(since ?? undefined, 50);
+  const orders = (await listOrdersModifiedSince(since ?? undefined, 50)) as WooOrder[];
+
   for (const o of orders) {
     const row = toRow(o);
     await prisma.order.upsert({
@@ -41,6 +62,8 @@ export async function GET(req: Request) {
   // advance cursor to "now" (safe even if zero results)
   await setCursor(CURSOR_ID, startedIso);
 
-  console.log(`[cron] pull-woo upserted=${orders.length} since=${since ?? "∅"} next=${startedIso}`);
+  console.log(
+    `[cron] pull-woo upserted=${orders.length} since=${since ?? "∅"} next=${startedIso}`
+  );
   return Response.json({ ok: true, upserted: orders.length, nextCursor: startedIso });
 }
