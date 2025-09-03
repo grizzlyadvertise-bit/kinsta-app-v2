@@ -2,19 +2,25 @@
 import { JWT } from "google-auth-library";
 import { getSetting } from "./settings";
 
+function decodeKey(raw?: string, b64?: string): string {
+  if (b64 && b64.trim()) {
+    return Buffer.from(b64, "base64").toString("utf8");
+  }
+  if (!raw) throw new Error("Service Account key missing");
+  return raw.includes("\\n") ? raw.replace(/\\n/g, "\n") : raw;
+}
+
 export async function getAccessToken(): Promise<string> {
   const clientEmail = await getSetting("GOOGLE_SA_CLIENT_EMAIL");
-  const privateKeyRaw = await getSetting("GOOGLE_SA_PRIVATE_KEY");
-  if (!clientEmail || !privateKeyRaw) throw new Error("Service Account not configured");
+  const privateKeyRaw = await getSetting("GOOGLE_SA_PRIVATE_KEY");        // supports \n-escaped
+  const privateKeyB64 = await getSetting("GOOGLE_SA_PRIVATE_KEY_B64");    // optional base64
+  if (!clientEmail) throw new Error("Service Account not configured: email missing");
 
-  // Support either literal "\n" or actual newlines from env
-  const privateKey = privateKeyRaw.includes("\\n")
-    ? privateKeyRaw.replace(/\\n/g, "\n")
-    : privateKeyRaw;
+  const key = decodeKey(privateKeyRaw, privateKeyB64);
 
   const client = new JWT({
     email: clientEmail,
-    key: privateKey,
+    key,
     scopes: ["https://www.googleapis.com/auth/spreadsheets"],
   });
 

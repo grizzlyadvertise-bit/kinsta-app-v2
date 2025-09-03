@@ -21,6 +21,11 @@ export const DEFINITIONS: KeyDef[] = [
   { key: "ETR_RECIPIENT_EMAILS" },
   { key: "SAFE_MODE" },
   { key: "APP_CRON_SECRET", secret: true },
+  { key: "GOOGLE_SA_CLIENT_EMAIL" },
+{ key: "GOOGLE_SA_PRIVATE_KEY", secret: true },
+{ key: "GOOGLE_SA_PRIVATE_KEY_B64", secret: true }, // optional, safer input path
+{ key: "SHEETS_SPREADSHEET_ID" },
+{ key: "SHEETS_TAB_LEDGER" }, // if you use a Ledger tab
 ];
 
 // typed access to process.env
